@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Model caches (large, downloaded at runtime)
+.cache/
+models/
+*.ct2
+
+# Audio samples and generated transcripts
+samples/
+recordings/
+out/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.srt
+*.vtt
+!tests/**/*.srt
+!tests/**/*.vtt
+
+# Secrets (e.g. HF_TOKEN in a local env file)
+.env

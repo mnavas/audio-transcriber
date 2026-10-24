@@ -1,0 +1,13 @@
+# Core ML stack (offline transcription + diarization).
+# NOTE: torch install is hardware-specific. On a CPU-only machine (this one), the
+# default PyPI wheels are fine. For CUDA, install the matching torch build from
+# https://pytorch.org first, then the rest of this file.
+faster-whisper>=1.0.0
+pyannote.audio>=3.1
+torch>=2.1
+torchaudio>=2.1
+
+# Optional GUI (milestone M5):
+#   pip install PySide6>=6.6
+# Dev/test:
+#   pip install pytest>=8.0
