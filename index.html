@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>audio-transcriber — turn conversations into text</title>
+  <meta name="description" content="A free, fully offline desktop app and CLI that transcribes conversation recordings in Spanish, English, and Japanese — with speaker labels and timestamps. Powered by Whisper (faster-whisper) and pyannote diarization. Exports txt, srt, vtt, and json. Nothing leaves your machine." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:       #4F46E5;
+      --accent-dark:  #4338CA;
+      --accent-pale:  #EEF2FF;
+      --gray-50:    #FAFAF9;
+      --gray-100:   #F4F4F2;
+      --gray-200:   #E7E5E2;
+      --gray-400:   #A8A29E;
+      --gray-600:   #57534E;
+      --gray-700:   #44403C;
+      --gray-800:   #292524;
+      --gray-900:   #1C1917;
+      --white:      #FFFFFF;
+      --radius:     12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--gray-800);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .nav-inner {
+      padding: 0 2rem; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .nav-brand span { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a {
+      text-decoration: none; font-size: 0.875rem; font-weight: 500;
+      color: var(--gray-600); transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--gray-900); }
+
+    .nav-hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      padding: 6px; color: var(--gray-800);
+      flex-direction: column; gap: 5px; align-items: center; justify-content: center;
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 2px;
+      background: currentColor; border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    .nav-mobile {
+      display: none; flex-direction: column;
+      background: var(--white); border-top: 1px solid var(--gray-200);
+      padding: 1rem 1.5rem 1.25rem; gap: 0;
+    }
+    .nav-mobile.open { display: flex; }
+    .nav-mobile a {
+      text-decoration: none; font-size: 0.95rem; font-weight: 500;
+      color: var(--gray-700); padding: 0.7rem 0;
+      border-bottom: 1px solid var(--gray-100); transition: color 0.15s;
+    }
+    .nav-mobile a:last-of-type { border-bottom: none; }
+    .nav-mobile a:hover { color: var(--accent); }
+    .nav-mobile .btn { margin-top: 0.75rem; justify-content: center; width: 100%; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 0.5rem 1.25rem; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600;
+      text-decoration: none; transition: all 0.15s; border: none; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: var(--white); }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-outline {
+      background: transparent; color: var(--gray-800);
+      border: 1.5px solid var(--gray-200);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(160deg, var(--accent-pale) 0%, var(--white) 55%);
+      padding: 5rem 2rem 4rem; text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent-pale); border: 1px solid #4F46E555;
+      color: var(--accent-dark); font-size: 0.8rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem); font-weight: 800; line-height: 1.15;
+      color: var(--gray-900); max-width: 760px; margin: 0 auto 1.25rem;
+    }
+    .hero h1 .highlight { color: var(--accent); }
+    .hero p {
+      font-size: 1.125rem; color: var(--gray-600);
+      max-width: 580px; margin: 0 auto 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .hero-actions .btn { padding: 0.75rem 1.75rem; font-size: 1rem; }
+    .hero-meta {
+      margin-top: 2.5rem; font-size: 0.8rem; color: var(--gray-400);
+      display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap;
+    }
+
+    /* Transcript mockup — a diarized, multilingual conversation */
+    .transcript-mock {
+      margin: 3rem auto 0; max-width: 620px; text-align: left;
+      background: var(--white); border-radius: var(--radius);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15); border: 1px solid var(--gray-200);
+      padding: 1.5rem 1.5rem 1.25rem;
+    }
+    .waveform {
+      display: flex; align-items: center; gap: 3px; height: 34px;
+      margin-bottom: 1.25rem; opacity: 0.85;
+    }
+    .waveform i {
+      flex: 1; background: linear-gradient(var(--accent), #818CF8);
+      border-radius: 2px; min-width: 2px;
+    }
+    .t-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-start; }
+    .t-row:last-of-type { margin-bottom: 0; }
+    .t-time {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+      color: var(--gray-400); padding-top: 4px; white-space: nowrap;
+    }
+    .t-body { flex: 1; }
+    .t-speaker {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+      padding: 1px 8px; border-radius: 999px; display: inline-block; margin-bottom: 3px;
+    }
+    .t-s1 { background: var(--accent-pale); color: var(--accent-dark); }
+    .t-s2 { background: #ECFDF5; color: #047857; }
+    .t-text { font-size: 0.92rem; color: var(--gray-800); }
+    .t-lang {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      color: var(--gray-400); margin-left: 6px;
+    }
+    .transcript-caption {
+      margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px dashed var(--gray-200);
+      font-size: 0.74rem; color: var(--gray-400);
+      font-family: 'JetBrains Mono', monospace; text-align: center;
+    }
+
+    /* ── SECTION ── */
+    .section { padding: 5rem 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 800;
+      color: var(--gray-900); line-height: 1.2; margin-bottom: 1rem;
+    }
+    .section-sub { font-size: 1rem; color: var(--gray-600); max-width: 580px; }
+
+    /* ── FEATURES ── */
+    .features { background: var(--gray-50); }
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .feature-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1.75rem;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .feature-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); border-color: var(--accent); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: var(--accent-pale); display: flex; align-items: center;
+      justify-content: center; font-size: 1.25rem; margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.9rem; color: var(--gray-600); line-height: 1.6; }
+
+    /* ── HOW IT WORKS ── */
+    .how { background: var(--white); }
+    .how-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 2rem; margin-top: 3rem;
+    }
+    .how-step { display: flex; gap: 1.25rem; }
+    .how-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent); color: var(--white);
+      font-weight: 700; font-size: 0.875rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .how-step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .how-step p { font-size: 0.9rem; color: var(--gray-600); line-height: 1.6; }
+
+    /* ── SPECS ── */
+    .specs { background: var(--gray-900); }
+    .specs .section-label { color: #818CF8; }
+    .specs .section-title { color: var(--white); }
+    .specs .section-sub { color: var(--gray-400); }
+    .specs-table {
+      margin-top: 3rem; width: 100%; border-collapse: collapse;
+      background: rgba(255,255,255,0.03); border-radius: var(--radius); overflow: hidden;
+    }
+    .specs-table th, .specs-table td {
+      padding: 0.9rem 1.25rem; text-align: left; font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .specs-table th { color: var(--gray-400); font-weight: 600; }
+    .specs-table td { color: #E7E5E2; font-family: 'JetBrains Mono', monospace; }
+    .specs-table tr:last-child th, .specs-table tr:last-child td { border-bottom: none; }
+    .specs-note { margin-top: 1.5rem; color: var(--gray-400); font-size: 0.85rem; }
+
+    /* ── INSTALL ── */
+    .install { background: var(--gray-50); }
+    .steps {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 2rem; margin-top: 3rem;
+    }
+    .step { display: flex; gap: 1.25rem; }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent); color: var(--white);
+      font-weight: 700; font-size: 0.875rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .step p { font-size: 0.875rem; color: var(--gray-600); line-height: 1.6; }
+    .code-block {
+      background: #0D1117; border: 1px solid #30363D;
+      border-radius: var(--radius); padding: 1.5rem 1.75rem;
+      margin-top: 2.5rem; overflow-x: auto;
+    }
+    .code-block pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem; line-height: 1.7; color: #E6EDF3;
+    }
+    .code-block .cm { color: #8B949E; }
+
+    /* ── CONTRIBUTE ── */
+    .contribute { background: var(--white); }
+    .contribute-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem; margin-top: 3rem;
+    }
+    .contribute-card {
+      background: var(--gray-50); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1.5rem;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .contribute-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-color: var(--accent); }
+    .contribute-card .icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+    .contribute-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .contribute-card p { font-size: 0.875rem; color: var(--gray-600); line-height: 1.6; margin-bottom: 1rem; }
+    .contribute-card a {
+      font-size: 0.875rem; font-weight: 600; color: var(--accent); text-decoration: none;
+    }
+    .contribute-card a:hover { text-decoration: underline; }
+
+    /* ── SUPPORT ── */
+    .support { background: var(--gray-50); }
+    .support-inner {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 3rem; align-items: center; margin-top: 3rem;
+    }
+    @media (max-width: 768px) { .support-inner { grid-template-columns: 1fr; } }
+    .support-text h2 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; line-height: 1.25; margin-bottom: 1rem; }
+    .support-text p { font-size: 0.95rem; color: var(--gray-600); line-height: 1.7; margin-bottom: 1rem; }
+    .donate-card {
+      background: var(--white); border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius); padding: 2rem;
+    }
+    .donate-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+    .donate-options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .donate-btn {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0.875rem 1.25rem; border-radius: 10px; text-decoration: none;
+      font-size: 0.875rem; font-weight: 600; transition: opacity 0.15s;
+      border: none; cursor: pointer;
+    }
+    .donate-btn:hover { opacity: 0.88; }
+    .donate-btn-github { background: #24292F; color: var(--white); }
+    .donate-btn-paypal { background: #003087; color: var(--white); }
+    .donate-btn-icon { font-size: 1.1rem; }
+    .donate-btn-text { display: flex; flex-direction: column; line-height: 1.2; }
+    .donate-btn-text small { font-size: 0.75rem; font-weight: 400; opacity: 0.75; }
+
+    .deuna-btn {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: #1a1a2e; color: var(--white);
+      border: none; border-radius: 10px; padding: 0.75rem 1rem;
+      cursor: pointer; width: 100%; font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; font-weight: 600; transition: opacity 0.15s;
+    }
+    .deuna-btn:hover { opacity: 0.85; }
+    .deuna-btn-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .deuna-btn-text { display: flex; flex-direction: column; line-height: 1.2; text-align: left; }
+    .deuna-btn-text small { font-size: 0.75rem; font-weight: 400; opacity: 0.75; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.65); align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--white); border-radius: 20px;
+      padding: 2rem; max-width: 340px; width: 90%; text-align: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+    }
+    .modal-box h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .modal-box p { font-size: 0.85rem; color: var(--gray-600); margin-bottom: 1rem; }
+    .modal-box img { width: 100%; max-width: 260px; border-radius: 12px; }
+    .modal-close {
+      display: block; margin: 1rem auto 0; padding: 0.5rem 1.5rem;
+      background: var(--gray-100); border: none; border-radius: 8px;
+      font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; color: var(--gray-700);
+    }
+    .modal-close:hover { background: var(--gray-200); }
+
+    /* ── OPEN SOURCE ── */
+    .opensource { background: var(--accent); }
+    .opensource .section-title { color: var(--white); }
+    .opensource .section-sub { color: rgba(255,255,255,0.9); max-width: 600px; }
+    .license-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+      color: var(--white); font-size: 0.8rem; font-weight: 600;
+      padding: 5px 14px; border-radius: 999px; margin-bottom: 1.5rem;
+    }
+    .opensource .btn-white {
+      background: var(--white); color: var(--accent-dark); font-weight: 700;
+      padding: 0.875rem 2rem; font-size: 1rem; border-radius: 8px;
+      text-decoration: none; display: inline-block; margin-top: 2rem;
+      transition: opacity 0.15s;
+    }
+    .opensource .btn-white:hover { opacity: 0.9; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--gray-900); padding: 3rem 2rem; text-align: center;
+    }
+    footer .footer-brand {
+      display: flex; align-items: center; gap: 10px;
+      justify-content: center; margin-bottom: 1rem;
+    }
+    footer .footer-brand span { font-size: 1rem; font-weight: 700; color: var(--accent); }
+    footer p { font-size: 0.8rem; color: var(--gray-400); margin-top: 0.5rem; }
+    footer nav {
+      margin-top: 1.5rem; display: flex; gap: 1.5rem;
+      justify-content: center; flex-wrap: wrap;
+      background: none; border: none; position: static;
+    }
+    footer nav a { font-size: 0.8rem; color: var(--gray-400); text-decoration: none; }
+    footer nav a:hover { color: var(--white); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .nav-inner { padding: 0 1.25rem; }
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+      .hero { padding: 4rem 1.25rem 3rem; }
+      .section { padding: 3.5rem 1.25rem; }
+      .specs-table th, .specs-table td { padding: 0.7rem 0.9rem; font-size: 0.8rem; }
+      .t-time { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-brand">
+      <span>🎙 audio-transcriber</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#specs">Languages &amp; models</a>
+      <a href="#install">Install</a>
+      <a href="#support">Support</a>
+      <a href="https://github.com/mnavas/audio-transcriber" target="_blank" class="btn btn-primary">GitHub</a>
+    </div>
+    <button class="nav-hamburger" id="nav-toggle" aria-label="Open menu" onclick="toggleNav()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="#features" onclick="closeNav()">Features</a>
+    <a href="#how" onclick="closeNav()">How it works</a>
+    <a href="#specs" onclick="closeNav()">Languages &amp; models</a>
+    <a href="#install" onclick="closeNav()">Install</a>
+    <a href="#support" onclick="closeNav()">Support</a>
+    <a href="https://github.com/mnavas/audio-transcriber" target="_blank" class="btn btn-primary">GitHub</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🎙 Open source · Offline · Desktop + CLI</div>
+  <h1>Turn conversations into<br/><span class="highlight">accurate text</span></h1>
+  <p>A free, fully offline transcriber for your recordings — Spanish, English, and Japanese — with speaker labels and timestamps. Powered by Whisper and pyannote, it runs entirely on your machine. No cloud, no accounts, no per-minute fees.</p>
+  <div class="hero-actions">
+    <a href="https://github.com/mnavas/audio-transcriber" class="btn btn-primary">⬇ Get it on GitHub</a>
+    <a href="#install" class="btn btn-outline">Read the docs</a>
+  </div>
+  <div class="hero-meta">
+    <span>🔒 100% offline</span>
+    <span>🗣 ES · EN · JA</span>
+    <span>👥 Speaker labels</span>
+    <span>📝 TXT · SRT · VTT · JSON</span>
+    <span>🐍 Python · faster-whisper</span>
+  </div>
+
+  <div class="transcript-mock" aria-label="Example diarized multilingual transcript">
+    <div class="waveform" aria-hidden="true">
+      <i style="height:30%"></i><i style="height:65%"></i><i style="height:45%"></i><i style="height:90%"></i>
+      <i style="height:55%"></i><i style="height:80%"></i><i style="height:35%"></i><i style="height:70%"></i>
+      <i style="height:95%"></i><i style="height:40%"></i><i style="height:60%"></i><i style="height:85%"></i>
+      <i style="height:50%"></i><i style="height:75%"></i><i style="height:30%"></i><i style="height:65%"></i>
+      <i style="height:45%"></i><i style="height:88%"></i><i style="height:38%"></i><i style="height:58%"></i>
+      <i style="height:72%"></i><i style="height:48%"></i><i style="height:82%"></i><i style="height:34%"></i>
+    </div>
+    <div class="t-row">
+      <div class="t-time">00:00:02</div>
+      <div class="t-body">
+        <span class="t-speaker t-s1">Speaker 1</span>
+        <div class="t-text">Hola, ¿cómo estuvo tu fin de semana?<span class="t-lang">es</span></div>
+      </div>
+    </div>
+    <div class="t-row">
+      <div class="t-time">00:00:05</div>
+      <div class="t-body">
+        <span class="t-speaker t-s2">Speaker 2</span>
+        <div class="t-text">It was great — I finally finished editing the recording.<span class="t-lang">en</span></div>
+      </div>
+    </div>
+    <div class="t-row">
+      <div class="t-time">00:00:09</div>
+      <div class="t-body">
+        <span class="t-speaker t-s1">Speaker 1</span>
+        <div class="t-text">すごい！後で聞かせてね。<span class="t-lang">ja</span></div>
+      </div>
+    </div>
+    <div class="transcript-caption">conversation.m4a → transcript.json · 2 speakers · diarized &amp; timestamped</div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section features" id="features">
+  <div class="section-inner">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Private, multilingual transcription that just runs</h2>
+    <p class="section-sub">Drop in a recording and get back clean, speaker-labeled text — without sending a single second of audio to the cloud.</p>
+
+    <div class="feature-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Fully offline &amp; private</h3>
+        <p>Every step — decoding, transcription, and diarization — runs locally. Your conversations never leave your machine, so sensitive recordings stay yours. No accounts, no telemetry, no per-minute cloud bill.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🗣</div>
+        <h3>Spanish, English &amp; Japanese</h3>
+        <p>Transcribe in any of the three — or let Whisper auto-detect the language per file. Japanese comes out as natural, correctly spaced-free text, not forced word splits.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Who said what</h3>
+        <p>Built-in speaker diarization (pyannote) labels each turn — Speaker 1, Speaker 2, … — so conversations read like a script instead of one undifferentiated block of text.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⏱</div>
+        <h3>Word &amp; segment timestamps</h3>
+        <p>Every segment is time-coded, so you can jump straight to a moment in the audio — and export subtitles that line up with the recording.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>Four output formats</h3>
+        <p>Export a readable <strong>txt</strong>, subtitle <strong>srt</strong>/<strong>vtt</strong>, or the full structured <strong>json</strong> (segments, words, speakers, confidence) — all rendered from one canonical transcript.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🖥</div>
+        <h3>CLI and desktop GUI</h3>
+        <p>One reusable core, two ways to drive it: a scriptable command-line tool for batch jobs, and a PySide6 window to drop a file, transcribe, and export with a click.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📂</div>
+        <h3>Batch a whole folder</h3>
+        <p>Point it at a directory and let it transcribe every recording overnight. A failed file is reported and skipped — the batch keeps going.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Fast Whisper engine</h3>
+        <p>Uses faster-whisper (CTranslate2) with int8 on CPU and float16 on GPU, auto-detected. Pick any model size from <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">tiny</code> to <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">large-v3</code>.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎵</div>
+        <h3>Any audio or video in</h3>
+        <p>ffmpeg decodes it all — wav, mp3, m4a, flac, ogg, opus, even mp4/mkv — and resamples to what the models expect. No manual conversion first.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section how" id="how">
+  <div class="section-inner">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title">From recording to transcript in four steps</h2>
+    <p class="section-sub">No projects to manage, no presets to configure — give it a file and choose how you want the text back.</p>
+
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="how-num">1</div>
+        <div>
+          <h3>Drop in a recording</h3>
+          <p>Pick a file (or a whole folder) from the CLI or the GUI. ffmpeg handles any common audio or video format.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">2</div>
+        <div>
+          <h3>Choose language &amp; model</h3>
+          <p>Spanish, English, Japanese, or auto-detect — and a Whisper model size that fits your hardware and accuracy needs.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">3</div>
+        <div>
+          <h3>Transcribe &amp; diarize</h3>
+          <p>Whisper turns speech into text while pyannote figures out who is speaking, then each segment is matched to a speaker.</p>
+        </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">4</div>
+        <div>
+          <h3>Export</h3>
+          <p>Save a readable transcript, subtitles, or the full JSON — speaker-labeled and timestamped, ready to use.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECS -->
+<section class="section specs" id="specs">
+  <div class="section-inner">
+    <div class="section-label">Languages &amp; models</div>
+    <h2 class="section-title">Tuned for conversations, sized for your machine</h2>
+    <p class="section-sub">Transcription quality and speed scale with the Whisper model you choose. Start with <code style="color:#A5B4FC;font-family:'JetBrains Mono',monospace;">medium</code>; reach for <code style="color:#A5B4FC;font-family:'JetBrains Mono',monospace;">large-v3</code> for the best accuracy on Japanese and noisy audio.</p>
+
+    <table class="specs-table">
+      <tr><th>Whisper model</th><th>Relative speed</th><th>Accuracy</th><th>Good for</th></tr>
+      <tr><td>tiny / base</td><td>Fastest</td><td>Basic</td><td>Quick drafts, clean audio</td></tr>
+      <tr><td>small</td><td>Fast</td><td>Good</td><td>Everyday CPU use</td></tr>
+      <tr><td>medium</td><td>Moderate</td><td>Great</td><td>Default — balanced</td></tr>
+      <tr><td>large-v3</td><td>Slowest</td><td>Best</td><td>Japanese, noisy / overlapping speech</td></tr>
+    </table>
+
+    <p class="specs-note">
+      Languages: <strong style="color:#E7E5E2;">Spanish (es)</strong>, <strong style="color:#E7E5E2;">English (en)</strong>, <strong style="color:#E7E5E2;">Japanese (ja)</strong>, or auto-detect. Engine: faster-whisper (CTranslate2), int8 on CPU / float16 on GPU. Diarization: pyannote <code style="color:#A5B4FC;font-family:'JetBrains Mono',monospace;">speaker-diarization-3.1</code> (a one-time Hugging&nbsp;Face model download, then fully offline). Outputs: txt, srt, vtt, json.
+    </p>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="section install" id="install">
+  <div class="section-inner">
+    <div class="section-label">Installation</div>
+    <h2 class="section-title">Up and running in minutes</h2>
+    <p class="section-sub">Python 3.11+, Linux / macOS / Windows. You'll also need ffmpeg on your PATH.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Clone &amp; install</h3>
+          <p>Create a virtual environment and install the core (faster-whisper, pyannote, torch). Add <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">PySide6</code> for the GUI.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3>Enable speaker labels (once)</h3>
+          <p>Accept the pyannote model terms on Hugging Face and set <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">HF_TOKEN</code>. The weights download once, then diarization runs offline. Skip it with <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">--no-diarize</code>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Transcribe</h3>
+          <p>Run <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">transcribe</code> on a file or folder, or launch the GUI and drop a recording in.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <pre><span class="cm"># Clone the repository</span>
+git clone https://github.com/mnavas/audio-transcriber.git
+cd audio-transcriber
+
+<span class="cm"># Install (CPU wheels by default; see README for CUDA)</span>
+python3 -m venv .venv
+source .venv/bin/activate   <span class="cm"># Windows: .venv\Scripts\activate</span>
+pip install -r requirements.txt
+pip install -e .
+
+<span class="cm"># One-time: speaker labels need a Hugging Face token</span>
+export HF_TOKEN=hf_xxxxxxxxxxxxxxxxx
+
+<span class="cm"># Transcribe a file…</span>
+transcribe interview.m4a --language ja --num-speakers 2 --format srt
+
+<span class="cm"># …or a whole folder, every format at once</span>
+transcribe ./recordings --format all --output-dir ./out
+
+<span class="cm"># …or use the desktop app</span>
+python -m gui.app</pre>
+    </div>
+
+    <p style="margin-top:2rem;color:var(--gray-600);font-size:0.875rem;">
+      Full setup (ffmpeg, the Hugging Face step, CUDA, model-size guidance) is in the
+      <a href="https://github.com/mnavas/audio-transcriber#readme" style="color:var(--accent);text-decoration:none;">README</a>,
+      and the design is written up in
+      <a href="docs/v0.0.0/plan.md" style="color:var(--accent);text-decoration:none;">docs/v0.0.0/plan.md</a>.
+    </p>
+  </div>
+</section>
+
+<!-- CONTRIBUTE -->
+<section class="section contribute" id="contribute">
+  <div class="section-inner">
+    <div class="section-label">Contribute</div>
+    <h2 class="section-title">Help make it better</h2>
+    <p class="section-sub">audio-transcriber is open source and welcomes contributions of any size.</p>
+
+    <div class="contribute-grid">
+      <div class="contribute-card">
+        <div class="icon">🐛</div>
+        <h3>Report a bug</h3>
+        <p>Something crash or mis-transcribe? Open an issue with steps to reproduce, the language, and your OS / Python version.</p>
+        <a href="https://github.com/mnavas/audio-transcriber/issues" target="_blank">Open an issue →</a>
+      </div>
+      <div class="contribute-card">
+        <div class="icon">💡</div>
+        <h3>Suggest a feature</h3>
+        <p>Want another language, live mic input, or a transcript editor? Open a feature request and describe it.</p>
+        <a href="https://github.com/mnavas/audio-transcriber/issues" target="_blank">Request a feature →</a>
+      </div>
+      <div class="contribute-card">
+        <div class="icon">🔧</div>
+        <h3>Submit a pull request</h3>
+        <p>Fork, branch, and send a PR. Read <a href="docs/v0.0.0/analysis.md" style="color:var(--accent);">docs/v0.0.0/analysis.md</a> first — it explains the architecture and the hard parts.</p>
+        <a href="https://github.com/mnavas/audio-transcriber/fork" target="_blank">Fork on GitHub →</a>
+      </div>
+      <div class="contribute-card">
+        <div class="icon">📖</div>
+        <h3>Improve the docs</h3>
+        <p>Docs are plain Markdown in the <code style="font-size:0.8rem;background:var(--gray-100);padding:1px 5px;border-radius:4px;">docs/</code> folder — easy to edit and submit.</p>
+        <a href="https://github.com/mnavas/audio-transcriber/tree/main/docs" target="_blank">Browse the docs →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUPPORT -->
+<section class="section support" id="support">
+  <div class="section-inner">
+    <div class="section-label">Support the project</div>
+    <div class="support-inner">
+      <div class="support-text">
+        <h2>Keep audio-transcriber free and actively maintained</h2>
+        <p>audio-transcriber is built and maintained as a side project. It's free and open source — but development tools, time, and motivation all have a real cost.</p>
+        <p>If it saves you money and hassle transcribing your recordings, consider chipping in. Every contribution helps keep it maintained and improving.</p>
+        <p style="font-size:0.85rem;color:var(--gray-400);">All contributions go directly to the developer. No company, no VC behind this.</p>
+      </div>
+      <div class="donate-card">
+        <h3>Choose how to support</h3>
+        <div class="donate-options">
+
+          <a href="https://github.com/sponsors/mnavas" target="_blank" class="donate-btn donate-btn-github">
+            <span class="donate-btn-icon">♥</span>
+            <span class="donate-btn-text">
+              GitHub Sponsors
+              <small>Monthly or one-time via GitHub</small>
+            </span>
+          </a>
+
+          <a href="https://paypal.me/warionv" target="_blank" class="donate-btn donate-btn-paypal">
+            <span class="donate-btn-icon">💳</span>
+            <span class="donate-btn-text">
+              PayPal
+              <small>paypal.me/warionv</small>
+            </span>
+          </a>
+
+          <button class="deuna-btn" onclick="document.getElementById('deuna-modal').classList.add('open')">
+            <span class="deuna-btn-icon">📱</span>
+            <span class="deuna-btn-text">
+              De Una · Banco Pichincha
+              <small>Pago con QR — Ecuador</small>
+            </span>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OPEN SOURCE -->
+<section class="section opensource" id="opensource">
+  <div class="section-inner" style="text-align:center;">
+    <div class="license-badge">📄 MIT licensed</div>
+    <h2 class="section-title">Free and open source</h2>
+    <p class="section-sub">audio-transcriber is free to use, fork, and modify under the MIT license. No telemetry, no accounts, no cloud — everything runs on your machine.</p>
+    <a href="https://github.com/mnavas/audio-transcriber" class="btn-white">View on GitHub →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <span>🎙 audio-transcriber</span>
+  </div>
+  <p>Offline, multilingual conversation transcription — with speaker labels</p>
+  <nav>
+    <a href="https://github.com/mnavas/audio-transcriber">GitHub</a>
+    <a href="https://github.com/mnavas/audio-transcriber#readme">Install</a>
+    <a href="docs/v0.0.0/plan.md">Plan</a>
+    <a href="docs/v0.0.0/analysis.md">Analysis</a>
+    <a href="#contribute">Contribute</a>
+    <a href="#support">Support</a>
+    <a href="https://github.com/mnavas/audio-transcriber/issues">Issues</a>
+  </nav>
+</footer>
+
+<!-- DE UNA QR MODAL -->
+<div class="modal-overlay" id="deuna-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <h3>De Una · Banco Pichincha</h3>
+    <p>Escanea el QR con tu app bancaria para enviar tu aporte.<br>¡Muchas gracias!</p>
+    <img src="assets/deuna-qr.png" alt="QR De Una — Banco Pichincha" />
+    <button class="modal-close" onclick="document.getElementById('deuna-modal').classList.remove('open')">Cerrar</button>
+  </div>
+</div>
+
+<script>
+function toggleNav() {
+  document.getElementById('nav-toggle').classList.toggle('open');
+  document.getElementById('nav-mobile').classList.toggle('open');
+}
+function closeNav() {
+  document.getElementById('nav-toggle').classList.remove('open');
+  document.getElementById('nav-mobile').classList.remove('open');
+}
+</script>
+
+</body>
+</html>

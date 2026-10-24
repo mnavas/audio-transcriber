@@ -53,6 +53,14 @@ semantic versioning.
 - Added `LICENSE` (MIT) to match the `pyproject.toml` declaration.
 - Documented third-party licenses + the PySide6 LGPL bundling caveat in the README.
 
+### 2026-10-23 — Landing page + public release
+- Added `index.html` — a static landing page matching the instax-printing site
+  (same layout/CSS, indigo theme): hero with a diarized multilingual transcript
+  mockup, features, how-it-works, languages/models table, install, contribute,
+  support (GitHub Sponsors / PayPal / De Una QR), MIT open-source section, footer.
+- Added `assets/deuna-qr.png` for the support modal.
+- Published the repository publicly as `mnavas/audio-transcriber`.
+
 ### Still to do for the v0.0.0 release
 - Install the ML stack in a venv and run the first real es/en/ja transcriptions
   (M1–M2 checkpoints) on sample audio.
