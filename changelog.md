@@ -45,6 +45,14 @@ semantic versioning.
   `requirements.txt`, `.gitignore`, `README.md` (incl. one-time pyannote/HF setup).
 - `tests/`: `test_formats.py` and `test_diarization.py` — pure unit tests, no ML deps.
 
+### 2026-10-23 — License review for public release
+- Reviewed all dependency licenses for public-repo safety: faster-whisper/CTranslate2/
+  Whisper weights/pyannote.audio all **MIT**, torch **BSD-3**, PySide6 **LGPLv3**.
+  None impose terms on our own code (nothing is redistributed — pip installs it).
+  Cleared repo of secrets/audio/paths (only an `hf_xxxx` placeholder in README).
+- Added `LICENSE` (MIT) to match the `pyproject.toml` declaration.
+- Documented third-party licenses + the PySide6 LGPL bundling caveat in the README.
+
 ### Still to do for the v0.0.0 release
 - Install the ML stack in a venv and run the first real es/en/ja transcriptions
   (M1–M2 checkpoints) on sample audio.

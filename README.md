@@ -77,3 +77,19 @@ Start with `medium`; drop to `small` for speed, raise to `large-v3` for accuracy
 ```bash
 pytest        # format + speaker-assignment unit tests (no ML stack required)
 ```
+
+## License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE).
+
+It depends on third-party packages that are installed separately (not redistributed
+here); each keeps its own license:
+
+- faster-whisper — MIT · CTranslate2 — MIT · Whisper model weights — MIT
+- pyannote.audio — MIT (the pretrained diarization models are gated on Hugging Face
+  and require accepting their terms once before download)
+- PyTorch / torchaudio — BSD-3-Clause
+- PySide6 (optional GUI) — LGPLv3. Used here as a standard pip dependency; if you later
+  **bundle** the app (e.g. PyInstaller), follow the LGPL relinking/notice terms. The GUI
+  uses only QtWidgets/QtCore — avoid the GPL-licensed QtCharts/QtDataVisualization.
+
